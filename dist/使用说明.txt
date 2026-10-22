@@ -4,7 +4,7 @@
 
 [查看最新版本与安装包](https://github.com/lesnolie/ExecutionerWatch/releases/latest)
 
-![ExecutionerWatch 0.9.1 interface preview](dist/ui-preview.png)
+![ExecutionerWatch 0.9.1 interface preview](https://raw.githubusercontent.com/lesnolie/ExecutionerWatch/main/dist/ui-preview.png)
 
 ## 安装和使用
 
