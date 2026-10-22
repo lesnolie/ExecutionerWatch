@@ -1,0 +1,7 @@
+node_modules/
+.research/
+backups/
+dist/*.zip
+dist/ExecutionerWatch-*/
+*.log
+

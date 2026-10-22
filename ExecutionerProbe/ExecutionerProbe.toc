@@ -1,0 +1,7 @@
+## Interface: 120100, 120105
+## Title: Executioner Probe
+## Notes: 只记录"处刑者"(445584) 的光环变化，并关联 ExecutionerWatch 的加层、到期、欠层、整体消失与失同步诊断。/eprobe 查看命令。
+## Version: 0.9.1
+## SavedVariables: ExecutionerProbeDB
+
+ExecutionerProbe.lua

@@ -1,0 +1,15 @@
+## Interface: 120100, 120105
+## Title: Executioner Watch
+## Notes: 战士处刑者监控。原生层数、逐层预测、欠层动画和取消提醒。/ew 设置。
+## Version: 0.9.1
+## SavedVariables: ExecutionerWatchDB
+
+Core.lua
+Model.lua
+Diagnostics.lua
+Sources.lua
+Native.lua
+Alerts.lua
+View.lua
+Settings.lua
+ExecutionerWatch.lua

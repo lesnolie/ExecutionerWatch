@@ -1,0 +1,222 @@
+local _, EW = ...
+if not EW.enabled then return end
+local View = {}
+View.__index = View
+EW.View = View
+local L, C = EW.layout, EW.colors
+
+local function Border(parent,color)
+  local lines={}
+  for i=1,4 do lines[i]=EW.Texture(parent,"OVERLAY",color) end
+  lines[1]:SetPoint("TOPLEFT"); lines[1]:SetPoint("TOPRIGHT"); lines[1]:SetHeight(1)
+  lines[2]:SetPoint("BOTTOMLEFT"); lines[2]:SetPoint("BOTTOMRIGHT"); lines[2]:SetHeight(1)
+  lines[3]:SetPoint("TOPLEFT"); lines[3]:SetPoint("BOTTOMLEFT"); lines[3]:SetWidth(1)
+  lines[4]:SetPoint("TOPRIGHT"); lines[4]:SetPoint("BOTTOMRIGHT"); lines[4]:SetWidth(1)
+  return lines
+end
+function View.New()
+  local self=setmetatable({slots={}, debts={}, texts={}, fade=1, clock=0},View)
+  local root=CreateFrame("Frame","ExecutionerWatchFrame",UIParent)
+  self.root=root
+  root:SetSize(L.total,L.height); root:SetPoint("CENTER",0,-160)
+  root:SetMovable(true); root:SetClampedToScreen(true)
+  self.native=EW.Native.New(root)
+  -- All custom animation lives on addon-owned siblings, never on AuraButtons.
+  local overlay=CreateFrame("Frame",nil,root)
+  self.overlay=overlay
+  overlay:SetAllPoints(); overlay:SetFrameLevel(root:GetFrameLevel()+25)
+  overlay:EnableMouse(false)
+  for i=1,EW.cap do
+    local slot=CreateFrame("Frame",nil,overlay)
+    slot:SetSize(L.width,L.height); slot:SetPoint("TOPLEFT",root,"TOPLEFT",(i-1)*L.pitch,0)
+    slot:EnableMouse(false)
+    Border(slot,C.line)
+    local previewNative=EW.Texture(slot,"BACKGROUND",{0.10,0.40,0.35,1})
+    previewNative:SetAllPoints(); previewNative:SetAlpha(0)
+    -- Background below the native fill; keep the native total visible even
+    -- when the overlay is a partial-height prediction.
+    local back=EW.Texture(root,"BACKGROUND",C.slot)
+    back:SetSize(L.width,L.height); back:SetPoint("TOPLEFT",root,"TOPLEFT",(i-1)*L.pitch,0)
+    local fill=CreateFrame("StatusBar",nil,slot)
+    fill:SetPoint("TOPLEFT",1,-1); fill:SetPoint("BOTTOMRIGHT",-1,1)
+    fill:SetOrientation("VERTICAL"); fill:SetMinMaxValues(0,1)
+    fill:SetStatusBarTexture(EW.white); fill:SetStatusBarColor(1,1,1,1)
+    fill:SetValue(0); fill:EnableMouse(false)
+    local text=EW.Font(overlay,11)
+    text:SetWidth(L.width+2); text:SetJustifyH("CENTER")
+    text:SetPoint("TOP",slot,"BOTTOM",0,-4)
+    self.slots[i]={frame=slot,fill=fill,back=back,previewNative=previewNative}
+    self.texts[i]=text
+    if i<EW.cap then
+      local gap=EW.Texture(overlay,"OVERLAY",C.line)
+      gap:SetSize(L.gap,L.height)
+      gap:SetPoint("TOPLEFT",root,"TOPLEFT",i*L.pitch-L.gap,0)
+    end
+  end
+  self.warning=Border(overlay,{0.9,0.48,0.21,0.65})
+  self.badge=EW.Font(overlay,10)
+  self.badge:SetPoint("BOTTOMLEFT",root,"TOPLEFT",0,4)
+  self.debtLane=CreateFrame("Frame",nil,root)
+  self.debtLane:SetSize(5*(L.debtWidth+L.debtGap)-L.debtGap,L.height)
+  self.debtLane:SetPoint("TOPLEFT",root,"TOPRIGHT",8,0)
+  self.debtLane:EnableMouse(false)
+  for i=1,5 do
+    local bar=CreateFrame("Frame",nil,self.debtLane)
+    bar:SetSize(L.debtWidth,L.height)
+    bar:SetPoint("TOPLEFT",self.debtLane,"TOPLEFT",(i-1)*(L.debtWidth+L.debtGap),0)
+    bar:EnableMouse(false)
+    local back=EW.Texture(bar,"BACKGROUND",{0.20,0.045,0.045,0.85}); back:SetAllPoints()
+    Border(bar,C.line)
+    local fill=CreateFrame("StatusBar",nil,bar)
+    fill:SetPoint("TOPLEFT",1,-1); fill:SetPoint("BOTTOMRIGHT",-1,1)
+    fill:SetOrientation("VERTICAL"); fill:SetMinMaxValues(0,1)
+    fill:SetStatusBarTexture(EW.white); fill:SetStatusBarColor(1,1,1,1)
+    fill:SetValue(0); fill:EnableMouse(false)
+    local text=EW.Font(bar,11); text:SetWidth(L.debtWidth+2)
+    text:SetJustifyH("CENTER"); text:SetPoint("TOP",bar,"BOTTOM",0,-4)
+    text:SetTextColor(1,0.58,0.53,1)
+    bar.fill,bar.text=fill,text
+    self.debts[i]=bar
+  end
+  self.overflow=EW.Font(self.debtLane,10)
+  self.overflow:SetText("…")
+  local textLayer=CreateFrame("Frame",nil,root)
+  textLayer:SetAllPoints(); textLayer:SetFrameLevel(root:GetFrameLevel()+30); textLayer:EnableMouse(false)
+  self.previewAlert=EW.Font(textLayer,14)
+  self.previewAlert:SetText("! 取消 !"); self.previewAlert:SetTextColor(0.96,0.36,0.31,1)
+  self.previewCount=EW.Font(textLayer,11)
+  self.previewCount:SetPoint("BOTTOM",root,"TOP",0,5)
+  -- Separate input frame, so invisible areas do not intercept clicks and
+  -- the native frame hierarchy is never used to infer aura visibility.
+  local handle=CreateFrame("Frame",nil,UIParent)
+  self.handle=handle
+  handle:SetFrameStrata("HIGH"); handle:SetSize(L.total,L.height+L.timerHeight+28)
+  handle:RegisterForDrag("LeftButton"); handle:EnableMouseWheel(true)
+  handle:SetScript("OnDragStart",function()
+    if not EW.db.locked and not InCombatLockdown() then root:StartMoving() end
+  end)
+  handle:SetScript("OnDragStop",function()
+    root:StopMovingOrSizing()
+    local point,_,relative,x,y=root:GetPoint()
+    EW.db.point={point,relative,x,y}
+  end)
+  handle:SetScript("OnMouseUp",function(_,button)
+    if button=="RightButton" then EW.Settings:Toggle() end
+  end)
+  handle:SetScript("OnMouseWheel",function(_,delta)
+    if IsControlKeyDown() then EW.SetOption("scale",EW.db.scale*(delta>0 and 1.1 or 1/1.1))
+    elseif IsShiftKeyDown() then EW.SetOption("alpha",EW.db.alpha+delta*0.05) end
+  end)
+  handle:SetScript("OnEnter",function()
+    GameTooltip:SetOwner(handle,"ANCHOR_TOP")
+    GameTooltip:AddLine("处刑者监控")
+    GameTooltip:AddLine("亮色高度和秒数是预测；暗色整槽与总层数由游戏控制。",0.8,0.9,0.86,true)
+    if EW.model.reason~="" then GameTooltip:AddLine(EW.model.reason,1,0.7,0.35,true) end
+    if not EW.source.found then GameTooltip:AddLine("请在冷却管理器追踪处刑者。",1,0.7,0.35,true) end
+    GameTooltip:AddLine("右键设置 · Ctrl+滚轮缩放 · Shift+滚轮透明度",1,1,1,true)
+    GameTooltip:Show()
+  end)
+  handle:SetScript("OnLeave",function() GameTooltip:Hide() end)
+  self.unlock=Border(handle,{0.8,0.65,0.28,0.7})
+  self:Layout()
+  return self
+end
+function View:Layout()
+  if InCombatLockdown() then self.deferred=true; return end
+  local db=EW.db
+  self.root:SetScale(db.scale)
+  self.root:ClearAllPoints()
+  if db.point then self.root:SetPoint(db.point[1],UIParent,db.point[2],db.point[3],db.point[4])
+  else self.root:SetPoint("CENTER",0,-160) end
+  self.handle:SetScale(db.scale)
+  self.handle:ClearAllPoints(); self.handle:SetPoint("TOPLEFT",self.root,"TOPLEFT")
+  self.native:Layout(db.alertScale)
+  self.previewAlert:SetFont(EW.font,14*db.alertScale,"OUTLINE")
+  self.previewAlert:ClearAllPoints()
+  self.previewAlert:SetPoint("TOP",self.root,"BOTTOM",0,-L.timerHeight-7)
+  for _, slot in ipairs(self.slots) do
+    EW.Gradient(slot.fill:GetStatusBarTexture(),C.low,C.high,db.showGradient)
+  end
+  for _,bar in ipairs(self.debts) do
+    EW.Gradient(bar.fill:GetStatusBarTexture(),C.debtLow,C.debtHigh,db.showGradient)
+  end
+  self.deferred=false
+end
+function View:Preview(now, real)
+  local panel=EW.Settings and EW.Settings:IsOpen()
+  if InCombatLockdown() then return nil end
+  local mode=self.previewMode
+  if not mode and real.state=="IDLE" and (panel or not EW.db.locked) then mode="normal" end
+  if not mode then return nil end
+  local count=mode=="cancel" and 2 or mode=="debt" and 5 or 3
+  local result={state=mode=="uncertain" and "UNCERTAIN" or "ACTIVE", count=count,
+    debt=(mode=="debt" or mode=="cancel") and 2 or 0, rows={}, debtRows={}, reason="预览"}
+  for i=1,count do
+    result.rows[i]={duration=18,expiresAt=now+4.6+(i-1)*2.7}
+  end
+  for i=1,result.debt do
+    result.debtRows[i]={id=count+i,duration=18,expiresAt=now+16+(i-1)*2}
+  end
+  return result
+end
+function View:Render(snapshot, now, elapsed)
+  local db=EW.db
+  local preview=self:Preview(now,snapshot)
+  local s=preview or snapshot
+  local active=s.state=="ACTIVE"
+  self.native:Render(db,snapshot)
+  if preview then
+    self.native.stacks:SetAlpha(0); self.native.count:SetAlpha(0)
+    for _,alert in ipairs(self.native.alerts) do alert:SetAlpha(0) end
+  end
+  -- Preview is purely addon-owned. It never changes the model or sounds.
+  self.previewCount:SetText(preview and tostring(s.count) or "")
+  self.previewCount:SetAlpha(db.showText and preview and 1 or 0)
+  self.previewAlert:SetAlpha(preview and s.debt>0 and s.count<=db.alertAt and db.showAlert and 1 or 0)
+  for i,slot in ipairs(self.slots) do
+    local record=active and s.rows[i]
+    local left=record and math.max(0,record.expiresAt-now) or 0
+    slot.fill:SetValue(record and math.min(1,left/record.duration) or 0)
+    slot.fill:SetAlpha(record and db.showPips and 1 or 0)
+    slot.frame:SetAlpha(db.showPips and 1 or 0)
+    slot.back:SetAlpha(db.showPips and 1 or 0)
+    slot.previewNative:SetAlpha(preview and i<=s.count and (active and 0.5 or 1) or 0)
+    self.texts[i]:SetText(record and db.showTimers and db.showPips and string.format("%.1f",left) or "")
+    self.texts[i]:SetTextColor(unpack(C.text))
+  end
+  self.overlay:SetAlpha(db.showPips and 1 or 0)
+  self.badge:SetText(preview and "预览" or (active and "~" or s.state=="UNCERTAIN" and "?" or ""))
+  self.badge:SetTextColor(unpack(C.muted))
+  for _,line in ipairs(self.warning) do line:SetAlpha(s.debt>0 and 0.7 or 0) end
+  local visible=active and db.showDebtAnim and math.min(db.debtMax,s.debt) or 0
+  for i,bar in ipairs(self.debts) do
+    local record=active and s.debtRows and s.debtRows[i]
+    local left=record and math.max(0,record.expiresAt-now) or 0
+    bar:SetAlpha(i<=visible and record and 1 or 0)
+    bar.fill:SetValue(record and math.min(1,left/record.duration) or 0)
+    bar.text:SetText(i<=visible and record and db.showTimers and string.format("%.1f",left) or "")
+  end
+  self.overflow:ClearAllPoints()
+  self.overflow:SetPoint("BOTTOMLEFT",self.debtLane,"TOPLEFT",math.max(0,visible-1)*(L.debtWidth+L.debtGap),2)
+  self.overflow:SetAlpha(visible>0 and s.debt>visible and 1 or 0)
+  if visible>0 then
+    -- Gentle back-and-forth motion keeps countdown text continuously readable.
+    local phase=(now/1.6)%1
+    local x=8-3*(0.5-0.5*math.cos(2*math.pi*phase))
+    self.debtLane:ClearAllPoints(); self.debtLane:SetPoint("TOPLEFT",self.root,"TOPRIGHT",x,0)
+    self.debtLane:SetAlpha(1)
+  else self.debtLane:SetAlpha(0) end
+  local any=db.showPips or db.showText or db.showAlert or db.showDebtAnim
+  local shown=s.state~="IDLE" or preview or not db.locked
+  local target=any and (shown and 1 or db.idleAlpha) or 0
+  local speed=target>self.fade and 10 or 3
+  if target>self.fade then self.fade=math.min(target,self.fade+elapsed*speed)
+  else self.fade=math.max(target,self.fade-elapsed*speed) end
+  -- The native aura must remain visible when the prediction missed an entire
+  -- cycle. Fade addon-owned backgrounds/overlays, never the native parent.
+  self.root:SetAlpha(db.alpha)
+  self.overlay:SetAlpha(db.showPips and self.fade or 0)
+  for _,slot in ipairs(self.slots) do slot.back:SetAlpha(db.showPips and self.fade or 0) end
+  self.handle:EnableMouse(any and self.fade>0.05 and not InCombatLockdown())
+  for _,line in ipairs(self.unlock) do line:SetAlpha(not db.locked and self.fade or 0) end
+end

@@ -1,0 +1,17 @@
+{
+  "name": "executioner-watch-checks",
+  "version": "0.9.1",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lesnolie/ExecutionerWatch.git"
+  },
+  "scripts": {
+    "test": "node tools/test.cjs",
+    "package": "node tools/package.cjs"
+  },
+  "devDependencies": {
+    "fengari-node-cli": "0.1.0",
+    "luaparse": "0.3.1"
+  }
+}
