@@ -1,5 +1,5 @@
 local _, EW = ...
-if not EW.enabled then return end
+if not EW.isWarrior then return end
 local View = {}
 View.__index = View
 EW.View = View
@@ -14,35 +14,36 @@ local function Border(parent,color)
   lines[4]:SetPoint("TOPRIGHT"); lines[4]:SetPoint("BOTTOMRIGHT"); lines[4]:SetWidth(1)
   return lines
 end
+
 function View.New()
-  local self=setmetatable({slots={}, debts={}, texts={}, fade=1, clock=0},View)
+  local self=setmetatable({slots={},debts={},gaps={},texts={},fade=0,clock=0,enabled=false},View)
   local root=CreateFrame("Frame","ExecutionerWatchFrame",UIParent)
   self.root=root
   root:SetSize(L.total,L.height); root:SetPoint("CENTER",0,-160)
-  root:SetMovable(true); root:SetClampedToScreen(true)
+  root:SetMovable(true); root:SetClampedToScreen(true); root:Hide()
   self.native=EW.Native.New(root)
-  -- All custom animation lives on addon-owned siblings, never on AuraButtons.
+  -- Addon-owned animation lives on siblings of the sealed native controls.
   local overlay=CreateFrame("Frame",nil,root)
   self.overlay=overlay
   overlay:SetAllPoints(); overlay:SetFrameLevel(root:GetFrameLevel()+25)
   overlay:EnableMouse(false)
   for i=1,EW.cap do
     local slot=CreateFrame("Frame",nil,overlay)
-    slot:SetSize(L.width,L.height); slot:SetPoint("TOPLEFT",root,"TOPLEFT",(i-1)*L.pitch,0)
+    slot:SetSize(L.width,L.height)
+    slot:SetPoint("TOPLEFT",root,"TOPLEFT",(i-1)*L.pitch,0)
     slot:EnableMouse(false)
     Border(slot,C.line)
     local previewNative=EW.Texture(slot,"BACKGROUND",{0.10,0.40,0.35,1})
     previewNative:SetAllPoints(); previewNative:SetAlpha(0)
-    -- Background below the native fill; keep the native total visible even
-    -- when the overlay is a partial-height prediction.
     local back=EW.Texture(root,"BACKGROUND",C.slot)
-    back:SetSize(L.width,L.height); back:SetPoint("TOPLEFT",root,"TOPLEFT",(i-1)*L.pitch,0)
+    back:SetSize(L.width,L.height)
+    back:SetPoint("TOPLEFT",root,"TOPLEFT",(i-1)*L.pitch,0)
     local fill=CreateFrame("StatusBar",nil,slot)
     fill:SetPoint("TOPLEFT",1,-1); fill:SetPoint("BOTTOMRIGHT",-1,1)
     fill:SetOrientation("VERTICAL"); fill:SetMinMaxValues(0,1)
     fill:SetStatusBarTexture(EW.white); fill:SetStatusBarColor(1,1,1,1)
     fill:SetValue(0); fill:EnableMouse(false)
-    local text=EW.Font(overlay,11)
+    local text=EW.Font(overlay,L.timerFont)
     text:SetWidth(L.width+2); text:SetJustifyH("CENTER")
     text:SetPoint("TOP",slot,"BOTTOM",0,-4)
     self.slots[i]={frame=slot,fill=fill,back=back,previewNative=previewNative}
@@ -51,16 +52,17 @@ function View.New()
       local gap=EW.Texture(overlay,"OVERLAY",C.line)
       gap:SetSize(L.gap,L.height)
       gap:SetPoint("TOPLEFT",root,"TOPLEFT",i*L.pitch-L.gap,0)
+      self.gaps[i]=gap
     end
   end
   self.warning=Border(overlay,{0.9,0.48,0.21,0.65})
-  self.badge=EW.Font(overlay,10)
+  self.badge=EW.Font(overlay,L.timerFont)
   self.badge:SetPoint("BOTTOMLEFT",root,"TOPLEFT",0,4)
   self.debtLane=CreateFrame("Frame",nil,root)
-  self.debtLane:SetSize(5*(L.debtWidth+L.debtGap)-L.debtGap,L.height)
+  self.debtLane:SetSize(EW.cap*(L.debtWidth+L.debtGap)-L.debtGap,L.height)
   self.debtLane:SetPoint("TOPLEFT",root,"TOPRIGHT",8,0)
   self.debtLane:EnableMouse(false)
-  for i=1,5 do
+  for i=1,EW.cap do
     local bar=CreateFrame("Frame",nil,self.debtLane)
     bar:SetSize(L.debtWidth,L.height)
     bar:SetPoint("TOPLEFT",self.debtLane,"TOPLEFT",(i-1)*(L.debtWidth+L.debtGap),0)
@@ -72,28 +74,28 @@ function View.New()
     fill:SetOrientation("VERTICAL"); fill:SetMinMaxValues(0,1)
     fill:SetStatusBarTexture(EW.white); fill:SetStatusBarColor(1,1,1,1)
     fill:SetValue(0); fill:EnableMouse(false)
-    local text=EW.Font(bar,11); text:SetWidth(L.debtWidth+2)
+    local text=EW.Font(bar,L.timerFont); text:SetWidth(L.debtWidth+2)
     text:SetJustifyH("CENTER"); text:SetPoint("TOP",bar,"BOTTOM",0,-4)
     text:SetTextColor(1,0.58,0.53,1)
     bar.fill,bar.text=fill,text
     self.debts[i]=bar
   end
-  self.overflow=EW.Font(self.debtLane,10)
+  self.overflow=EW.Font(self.debtLane,L.timerFont)
   self.overflow:SetText("…")
   local textLayer=CreateFrame("Frame",nil,root)
   textLayer:SetAllPoints(); textLayer:SetFrameLevel(root:GetFrameLevel()+30); textLayer:EnableMouse(false)
-  self.previewAlert=EW.Font(textLayer,14)
+  self.previewAlert=EW.Font(textLayer,L.alertFont)
   self.previewAlert:SetText("! 取消 !"); self.previewAlert:SetTextColor(0.96,0.36,0.31,1)
-  self.previewCount=EW.Font(textLayer,11)
+  self.previewCount=EW.Font(textLayer,L.timerFont)
   self.previewCount:SetPoint("BOTTOM",root,"TOP",0,5)
-  -- Separate input frame, so invisible areas do not intercept clicks and
-  -- the native frame hierarchy is never used to infer aura visibility.
+  -- Input lives on its own frame, avoiding both invisible click blockers and
+  -- any attempt to read or mutate protected native display state.
   local handle=CreateFrame("Frame",nil,UIParent)
   self.handle=handle
   handle:SetFrameStrata("HIGH"); handle:SetSize(L.total,L.height+L.timerHeight+28)
-  handle:RegisterForDrag("LeftButton"); handle:EnableMouseWheel(true)
+  handle:RegisterForDrag("LeftButton"); handle:EnableMouseWheel(true); handle:Hide()
   handle:SetScript("OnDragStart",function()
-    if not EW.db.locked and not InCombatLockdown() then root:StartMoving() end
+    if self.enabled and not EW.db.locked and not InCombatLockdown() then root:StartMoving() end
   end)
   handle:SetScript("OnDragStop",function()
     root:StopMovingOrSizing()
@@ -118,31 +120,85 @@ function View.New()
   end)
   handle:SetScript("OnLeave",function() GameTooltip:Hide() end)
   self.unlock=Border(handle,{0.8,0.65,0.28,0.7})
-  self:Layout()
+  self:Layout(true)
+  self:SetEnabled(false)
   return self
 end
-function View:Layout()
+
+function View:SetEnabled(enabled)
+  self.enabled=enabled == true
+  -- Alpha is already used on this addon-owned root during combat rendering.
+  -- Clear the whole HUD immediately without changing protected visibility.
+  self.root:SetAlpha(self.enabled and EW.db.alpha or 0)
+  if not self.enabled then
+    self.previewMode=nil
+    self.handle:EnableMouse(false)
+    GameTooltip:Hide()
+  end
+  if InCombatLockdown() then self.deferred=true; return end
+  if self.enabled then self.root:Show(); self.handle:Show()
+  else self.root:Hide(); self.handle:Hide(); GameTooltip:Hide() end
+end
+
+function View:ApplyGeometry()
+  local db=EW.db
+  self.root:SetSize(L.total,L.height)
+  self.root:SetScale(db.scale)
+  self.handle:SetSize(L.total,L.height+L.timerHeight+28)
+  self.handle:SetScale(db.scale)
+  self.handle:ClearAllPoints(); self.handle:SetPoint("TOPLEFT",self.root,"TOPLEFT")
+  for i,slot in ipairs(self.slots) do
+    slot.frame:SetSize(L.width,L.height)
+    slot.frame:ClearAllPoints()
+    slot.frame:SetPoint("TOPLEFT",self.root,"TOPLEFT",(i-1)*L.pitch,0)
+    slot.back:SetSize(L.width,L.height)
+    slot.back:ClearAllPoints()
+    slot.back:SetPoint("TOPLEFT",self.root,"TOPLEFT",(i-1)*L.pitch,0)
+    self.texts[i]:SetFont(EW.font,L.timerFont,"OUTLINE")
+    self.texts[i]:SetWidth(L.width+2)
+    if self.gaps[i] then
+      self.gaps[i]:SetSize(L.gap,L.height)
+      self.gaps[i]:ClearAllPoints()
+      self.gaps[i]:SetPoint("TOPLEFT",self.root,"TOPLEFT",i*L.pitch-L.gap,0)
+    end
+  end
+  self.badge:SetFont(EW.font,L.timerFont,"OUTLINE")
+  self.debtLane:SetSize(EW.cap*(L.debtWidth+L.debtGap)-L.debtGap,L.height)
+  for i,bar in ipairs(self.debts) do
+    bar:SetSize(L.debtWidth,L.height)
+    bar:ClearAllPoints()
+    bar:SetPoint("TOPLEFT",self.debtLane,"TOPLEFT",(i-1)*(L.debtWidth+L.debtGap),0)
+    bar.text:SetFont(EW.font,L.timerFont,"OUTLINE")
+    bar.text:SetWidth(L.debtWidth+2)
+  end
+  self.overflow:SetFont(EW.font,L.timerFont,"OUTLINE")
+  self.previewAlert:SetWidth(L.total)
+  self.previewAlert:SetFont(EW.font,L.alertFont*db.alertScale,"OUTLINE")
+  self.previewAlert:ClearAllPoints()
+  self.previewAlert:SetPoint("TOP",self.root,"BOTTOM",0,-L.timerHeight-7)
+  self.previewCount:SetFont(EW.font,L.timerFont,"OUTLINE")
+end
+
+function View:Layout(forceNative)
   if InCombatLockdown() then self.deferred=true; return end
   local db=EW.db
-  self.root:SetScale(db.scale)
+  self:ApplyGeometry()
   self.root:ClearAllPoints()
   if db.point then self.root:SetPoint(db.point[1],UIParent,db.point[2],db.point[3],db.point[4])
   else self.root:SetPoint("CENTER",0,-160) end
-  self.handle:SetScale(db.scale)
-  self.handle:ClearAllPoints(); self.handle:SetPoint("TOPLEFT",self.root,"TOPLEFT")
-  self.native:Layout(db.alertScale)
-  self.previewAlert:SetFont(EW.font,14*db.alertScale,"OUTLINE")
-  self.previewAlert:ClearAllPoints()
-  self.previewAlert:SetPoint("TOP",self.root,"BOTTOM",0,-L.timerHeight-7)
+  if self.native then self.native:Layout(db.alertScale) end
   for _, slot in ipairs(self.slots) do
     EW.Gradient(slot.fill:GetStatusBarTexture(),C.low,C.high,db.showGradient)
   end
   for _,bar in ipairs(self.debts) do
     EW.Gradient(bar.fill:GetStatusBarTexture(),C.debtLow,C.debtHigh,db.showGradient)
   end
+  self:SetEnabled(EW.runtimeEnabled)
   self.deferred=false
 end
+
 function View:Preview(now, real)
+  if not self.enabled then return nil end
   local panel=EW.Settings and EW.Settings:IsOpen()
   if InCombatLockdown() then return nil end
   local mode=self.previewMode
@@ -159,17 +215,19 @@ function View:Preview(now, real)
   end
   return result
 end
+
 function View:Render(snapshot, now, elapsed)
+  if not self.enabled then return end
   local db=EW.db
   local preview=self:Preview(now,snapshot)
   local s=preview or snapshot
   local active=s.state=="ACTIVE"
-  self.native:Render(db,snapshot)
-  if preview then
+  if self.native then self.native:Render(db,snapshot) end
+  if preview and self.native then
     self.native.stacks:SetAlpha(0); self.native.count:SetAlpha(0)
     for _,alert in ipairs(self.native.alerts) do alert:SetAlpha(0) end
   end
-  -- Preview is purely addon-owned. It never changes the model or sounds.
+  -- Preview is addon-owned and never changes the model or plays sounds.
   self.previewCount:SetText(preview and tostring(s.count) or "")
   self.previewCount:SetAlpha(db.showText and preview and 1 or 0)
   self.previewAlert:SetAlpha(preview and s.debt>0 and s.count<=db.alertAt and db.showAlert and 1 or 0)
@@ -184,7 +242,6 @@ function View:Render(snapshot, now, elapsed)
     self.texts[i]:SetText(record and db.showTimers and db.showPips and string.format("%.1f",left) or "")
     self.texts[i]:SetTextColor(unpack(C.text))
   end
-  self.overlay:SetAlpha(db.showPips and 1 or 0)
   self.badge:SetText(preview and "预览" or (active and "~" or s.state=="UNCERTAIN" and "?" or ""))
   self.badge:SetTextColor(unpack(C.muted))
   for _,line in ipairs(self.warning) do line:SetAlpha(s.debt>0 and 0.7 or 0) end
@@ -197,10 +254,10 @@ function View:Render(snapshot, now, elapsed)
     bar.text:SetText(i<=visible and record and db.showTimers and string.format("%.1f",left) or "")
   end
   self.overflow:ClearAllPoints()
-  self.overflow:SetPoint("BOTTOMLEFT",self.debtLane,"TOPLEFT",math.max(0,visible-1)*(L.debtWidth+L.debtGap),2)
+  self.overflow:SetPoint("BOTTOMLEFT",self.debtLane,"TOPLEFT",
+    math.max(0,visible-1)*(L.debtWidth+L.debtGap),2)
   self.overflow:SetAlpha(visible>0 and s.debt>visible and 1 or 0)
   if visible>0 then
-    -- Gentle back-and-forth motion keeps countdown text continuously readable.
     local phase=(now/1.6)%1
     local x=8-3*(0.5-0.5*math.cos(2*math.pi*phase))
     self.debtLane:ClearAllPoints(); self.debtLane:SetPoint("TOPLEFT",self.root,"TOPRIGHT",x,0)
@@ -212,8 +269,6 @@ function View:Render(snapshot, now, elapsed)
   local speed=target>self.fade and 10 or 3
   if target>self.fade then self.fade=math.min(target,self.fade+elapsed*speed)
   else self.fade=math.max(target,self.fade-elapsed*speed) end
-  -- The native aura must remain visible when the prediction missed an entire
-  -- cycle. Fade addon-owned backgrounds/overlays, never the native parent.
   self.root:SetAlpha(db.alpha)
   self.overlay:SetAlpha(db.showPips and self.fade or 0)
   for _,slot in ipairs(self.slots) do slot.back:SetAlpha(db.showPips and self.fade or 0) end

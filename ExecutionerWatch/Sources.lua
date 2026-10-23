@@ -1,35 +1,52 @@
 local _, EW = ...
-if not EW.enabled then return end
+if not EW.isWarrior then return end
 local Source = {}
 Source.__index = Source
 EW.Source = Source
 local secret = EW.IsSecret
 local function Public(value) return not secret(value) end
 local function Number(value) return Public(value) and type(value)=="number" end
+local function Active() return EW.enabled and EW.runtimeEnabled end
 
 function Source.New(model)
   return setmetatable({model=model, ids={}, hooks=setmetatable({}, {__mode="k"}),
     found=false, generation=0, lastSignal=-math.huge}, Source)
 end
-function Source:Removed(at)
-  -- Always reset, including UNCERTAIN with an empty queue. Invalidate deferred
-  -- updates so they cannot reopen an old aura after a removal/spec change.
+function Source:Invalidate()
   self.generation = self.generation + 1
   self.pending = nil
+end
+function Source:Resync(now, reason)
+  if not Active() then return end
+  self:Invalidate()
+  self.model:Uncertain(now, reason or "等待公开数据重新同步")
+  self:LoadIDs()
+  self:Scan(now)
+  self:Observe(now)
+end
+function Source:Removed(at)
+  if not Active() then return end
+  -- Always reset, including UNCERTAIN with an empty queue. Invalidate deferred
+  -- updates so they cannot reopen an old aura after a removal/spec change.
+  self:Invalidate()
   self.model:Reset(at, "增益整体移除")
 end
 function Source:Applied(at)
+  if not Active() then return end
   self.lastSignal = at
   self.model:Applied(at)
 end
 function Source:Updated(at)
+  if not Active() then return end
   self.lastSignal = at
   self.model:TargetRefresh(at)
 end
 function Source:Step(now)
+  if not Active() then return end
   self.model:Advance(now)
 end
 function Source:Observe(now)
+  if not Active() then return end
   -- Out of combat is NOT proof a field is readable: test every value before
   -- branching, formatting or arithmetic. Never feed a secret into the model.
   if InCombatLockdown() or self.pending or now-self.lastSignal < 0.30 then return end
@@ -46,6 +63,7 @@ function Source:Observe(now)
   if d then EW.db.duration=d end
 end
 function Source:LoadIDs()
+  if not Active() then return end
   self.ids = {}
   if not (C_CooldownViewer and Enum and Enum.CooldownViewerCategory) then return end
   for _, category in pairs(Enum.CooldownViewerCategory) do
@@ -81,7 +99,7 @@ function Source:Hook(frame)
     hooksecurefunc(frame, method, function()
       -- Only one viewer supplies evidence. No secret arguments are observed.
       local ok,err=pcall(function()
-        if self.frame==frame and self:Mine(frame) then callback(self, GetTime()) end
+        if Active() and self.frame==frame and self:Mine(frame) then callback(self, GetTime()) end
       end)
       if not ok then EW.ReportError("source:"..method,err) end
     end)
@@ -97,6 +115,7 @@ function Source:Hook(frame)
   end
 end
 function Source:Scan(now)
+  if not Active() then return end
   local selected
   for _, name in ipairs({"BuffIconCooldownViewer", "BuffBarCooldownViewer"}) do
     local viewer=_G[name]

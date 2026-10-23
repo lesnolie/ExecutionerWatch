@@ -1,23 +1,25 @@
-# ExecutionerWatch 0.9.1
+# ExecutionerWatch 0.10.0
 
 战士处刑者监控插件：五根竖条、逐层预计倒计时、框外红色欠层条、`! 取消 !` 提醒。原生层数与预测时间分开管理。
 
 [查看最新版本与安装包](https://github.com/lesnolie/ExecutionerWatch/releases/latest)
 
-![ExecutionerWatch 0.9.1 interface preview](https://raw.githubusercontent.com/lesnolie/ExecutionerWatch/main/dist/ui-preview.png)
+![ExecutionerWatch 0.10.0 interface preview](https://raw.githubusercontent.com/lesnolie/ExecutionerWatch/main/dist/ui-preview.png)
 
 ## 安装和使用
 
-从 Releases 下载 `ExecutionerWatch-0.9.1.zip`，将其中的 `ExecutionerWatch` 文件夹放进游戏的 `Interface/AddOns`，覆盖旧版同名文件。不要只复制入口 Lua：本版必须安装全部九个 Lua 文件。重载界面后输入 `/ew`。
+从 Releases 下载 `ExecutionerWatch-0.10.0.zip`，将其中的 `ExecutionerWatch` 文件夹放进游戏的 `Interface/AddOns`，覆盖旧版同名文件。不要只复制入口 Lua：本版必须安装全部九个 Lua 文件。重载界面后输入 `/ew`。
 
-在游戏冷却管理器中追踪处刑者增益。设置面板可以预览正常、欠层、取消、预测暂停四种状态。解锁后拖动；Ctrl+滚轮缩放，Shift+滚轮改变透明度。战斗中位置和缩放变更延迟到脱战应用。
+在游戏冷却管理器中追踪处刑者增益。武器战首次使用默认开启，狂暴战和防护战默认关闭；总开关与三个专精开关按角色分别保存。设置面板可以预览正常、欠层、取消、预测暂停四种状态，并分别调整竖条宽度、高度、间距和整体比例。解锁后拖动；Ctrl+滚轮复用整体比例，Shift+滚轮改变透明度。宽度、高度和间距保存后输入 `/reload` 生效；整体比例和位置在战斗中修改时延迟到脱战应用。
 
+- `/ew on` 开启当前角色的总开关，`/ew off` 关闭它；专精偏好不会被总开关清除。
+- `/ew spec on|off` 切换当前专精；各角色、各专精的选择独立保存。
 - 暗色整槽由游戏原生控件显示层数。
 - 亮色高度、秒数及 `~` 是预测。`?` 表示无法可靠同步，此时隐藏预测秒数、欠层和预测声音。
 - 框外红条显示欠层各自的预计剩余秒数和进度，默认最多三条；超过上限显示省略号。框内始终绿色，框外始终红色。
 - 未满层再触发时，外面最早的计时进入主框，保留原到期时间；新触发的计时排到外面末尾，从完整持续时间开始（通常 18 秒）。欠数不变，0 层清零。关闭逐层秒数会同时隐藏内外秒数。
 - 取消提醒仅提示手动操作，插件不会自动取消增益。
-- `/ew status` 查看状态和错误，`/ew resync` 请求重新同步。
+- `/ew status` 查看角色/专精开关、运行状态和错误，`/ew resync` 请求重新同步。
 - `/ew preview normal|debt|cancel|uncertain|off` 控制独立预览，预览不改真实模型、不播放声音。
 
 `ExecutionerProbe` 是可选诊断插件。`/eprobe model` 查看状态，`/eprobe mark` 打标记；日志保存在游戏 SavedVariables 中，正常退出或重载后落盘。
@@ -42,10 +44,10 @@ Model 的状态是 IDLE / ACTIVE / UNCERTAIN；满层由 count==5 表达，RESET
 
 Node.js 环境下执行 `npm ci`、`npm test`；Windows 下执行 `npm run package` 重新测试、生成预览并打包。包按 `.toc` 收集文件，逐项校验归档内容与源码 SHA-256。
 
-自动化覆盖语法、状态机、事件桥接、设置、生命周期和探针，以及已有实战日志回放。274 次定向刷新回放中，17 个公开真实层数核对点全部匹配；回放同时推进 30 Hz 计时调度。`dist/index.html` 从 Lua 主题和预览数据生成，用于布局检查，不能替代游戏截图。详见 [验证记录](docs/VALIDATION.md)。
+自动化覆盖版本一致性、语法、状态机、事件桥接、配置迁移、多角色与三专精开关、战斗停用、可调尺寸、生命周期和探针，以及已有实战日志回放。274 次定向刷新回放中，17 个公开真实层数核对点全部匹配；回放同时推进 30 Hz 计时调度。`dist/index.html` 从 Lua 主题和预览数据生成，用于布局检查，不能替代游戏截图。详见 [验证记录](docs/VALIDATION.md)。
 
 版本变化见 [CHANGELOG.md](CHANGELOG.md)。
 
-**事件来源已修正**：已有实战记录中没有屠戮者打击（445579）的公开施法成功事件，因此主插件不再依赖它。使用已选处刑者条目的定向刷新，先匹配预计到期，再预测新增/溢出；这仍是时间模型，不是游戏提供的逐层到期数据。来源改变、重载已有多层或公开层数不一致时暂停预测，新的完整增益周期恢复。新版本在当前客户端的受保护布局和最终渲染仍未运行验收。
+**事件来源已修正**：已有实战记录中没有屠戮者打击（445579）的公开施法成功事件，因此主插件不再依赖它。使用已选处刑者条目的定向刷新，先匹配预计到期，再预测新增/溢出；这仍是时间模型，不是游戏提供的逐层到期数据。来源改变、重载已有多层或公开层数不一致时暂停预测，新的完整增益周期恢复。0.10.0 的受保护布局、尺寸调整和最终渲染仍需在支持的本客户端内验收。
 
 本仓库暂未指定开源许可证。未经作者许可，请勿转载或再发布修改版本。

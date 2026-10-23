@@ -1,4 +1,4 @@
-local EW={enabled=true,cap=5}
+local EW={enabled=true,isWarrior=true,cap=5}
 assert(loadfile('ExecutionerWatch/Model.lua'))('ExecutionerWatch',EW)
 local sessions=dofile('tests/fixtures/combat-history.lua')
 local checked,updates=0,0
