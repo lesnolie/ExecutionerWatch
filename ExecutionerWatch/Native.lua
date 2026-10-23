@@ -103,16 +103,6 @@ function Native.New(root)
   end
   return self
 end
-function Native:Destroy()
-  -- Called only outside combat. A protected AuraContainer tree cannot be
-  -- resized safely after initialization, so replacement layers are built
-  -- before their predecessors are hidden.
-  for _,frame in ipairs(self.frames) do
-    frame:Hide()
-  end
-  self.alerts={}
-  self.frames={}
-end
 function Native:Layout(scale)
   for _, alert in ipairs(self.alerts) do
     alert:SetScale(scale); alert:ClearAllPoints()

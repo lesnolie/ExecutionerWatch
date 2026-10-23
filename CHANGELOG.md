@@ -5,7 +5,7 @@
 - Enabled Arms (specialization 71) by default and disabled Fury (72) and Protection (73) by default.
 - Added character-scoped master and per-specialization switches, with `/ew on`, `/ew off`, and `/ew spec on|off`.
 - Added independent bar width, height, and spacing controls while reusing the existing overall scale slider.
-- Deferred protected native Aura rebuilds and visibility changes until combat ends; disabling immediately invalidates predictions and alert state.
+- Saved bar geometry for application on UI reload, avoiding native frame allocation growth; deferred protected visibility changes until combat ends and immediately cleared disabled HUD alpha, predictions, and alert state.
 - Reorganized the settings panel around character/spec controls, display toggles, sizing, scaling, and alert controls.
 - Added migration, multi-character isolation, specialization lifecycle, combat shutdown, and sizing regression coverage.
 

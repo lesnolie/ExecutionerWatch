@@ -6,7 +6,7 @@ local frame=CreateFrame("Frame")
 local initialized=false
 local scanClock, renderClock, idClock=0,0,0
 local lastError, lastErrorAt
-local nativeLayoutAt, nativeLayoutDirty
+local activeGeometry
 
 local function SnapshotLayout()
   local L=EW.layout
@@ -20,9 +20,10 @@ local function RestoreLayout(saved)
   for key,value in pairs(saved) do EW.layout[key]=value end
 end
 
-local function ScheduleNativeLayout()
-  nativeLayoutAt=GetTime()+0.12
-  nativeLayoutDirty=true
+local function RestoreActiveGeometry()
+  if activeGeometry then RestoreLayout(activeGeometry) end
+  EW.reloadRequired=activeGeometry and (EW.db.width~=activeGeometry.width
+    or EW.db.height~=activeGeometry.height or EW.db.gap~=activeGeometry.gap) or false
 end
 
 local function Ready()
@@ -33,12 +34,10 @@ local function Ready()
 end
 
 local function ApplyLayout(forceNative)
-  if InCombatLockdown() then EW.deferred=true; nativeLayoutDirty=true; return end
-  EW.UpdateLayout(EW.db)
+  if InCombatLockdown() then EW.deferred=true; return end
+  RestoreActiveGeometry()
   if EW.view then EW.view:Layout(forceNative == true) end
   EW.deferred=false
-  nativeLayoutDirty=false
-  nativeLayoutAt=nil
 end
 
 local function ReportError(where,err)
@@ -103,31 +102,26 @@ end
 function EW.SetOption(key,value)
   if EW.defaults[key]==nil or not EW.db then return end
   local old=EW.db[key]
-  local oldLayout=SnapshotLayout()
   EW.db[key]=value
   EW.db=EW.LoadSettings(EW.db)
+  RestoreActiveGeometry()
   if EW.db[key]==old then return end
   if InCombatLockdown() then
-    RestoreLayout(oldLayout)
     EW.deferred=true
-    nativeLayoutDirty=true
     if EW.Settings and EW.Settings.frame then EW.Settings:Sync() end
     return
   end
   ApplyLayout(false)
-  ScheduleNativeLayout()
   if EW.Settings and EW.Settings.frame then EW.Settings:Sync() end
 end
 
 function EW.ResetPosition()
-  local oldLayout=SnapshotLayout()
   EW.db.point=nil; EW.db.scale=1; EW.db.alpha=1; EW.db.alertScale=1
   EW.db.width=EW.defaults.width; EW.db.height=EW.defaults.height; EW.db.gap=EW.defaults.gap
   EW.db=EW.LoadSettings(EW.db)
+  RestoreActiveGeometry()
   if InCombatLockdown() then
-    RestoreLayout(oldLayout)
     EW.deferred=true
-    nativeLayoutDirty=true
   else
     ApplyLayout(true)
   end
@@ -202,6 +196,7 @@ frame:SetScript("OnEvent",function(_,event,a1,a2,a3)
   local ok,err=pcall(function()
     if event=="ADDON_LOADED" and a1==addonName then
       EW.db=EW.LoadSettings(ExecutionerWatchDB); ExecutionerWatchDB=EW.db
+      activeGeometry=SnapshotLayout()
       EW.currentSpecID=EW.GetCurrentSpecID()
       EW.enabled=EW.GetMasterEnabled(EW.db)
       EW.runtimeEnabled=EW.enabled and EW.IsSpecEnabled(EW.db,EW.currentSpecID)
@@ -225,11 +220,11 @@ frame:SetScript("OnEvent",function(_,event,a1,a2,a3)
           Ready(); EW.source:LoadIDs(); EW.source:Scan(now); EW.source:Observe(now)
         end
       elseif event=="PLAYER_REGEN_ENABLED" then
-        if nativeLayoutDirty or EW.deferred or (EW.view and EW.view.deferred) then
-          EW.UpdateLayout(EW.db)
+        if EW.deferred or (EW.view and EW.view.deferred) then
+          RestoreActiveGeometry()
           if EW.view then EW.view:Layout(true) else Ready() end
         end
-        EW.deferred=false; nativeLayoutDirty=false; nativeLayoutAt=nil
+        EW.deferred=false
         if EW.runtimeEnabled then Ready(); EW.source:Observe(now) end
       elseif event=="PLAYER_REGEN_DISABLED" then
         if EW.view and EW.view.root then EW.view.root:StopMovingOrSizing(); EW.view.previewMode=nil end
@@ -249,17 +244,6 @@ frame:SetScript("OnUpdate",function(_,elapsed)
   local delta=renderClock; renderClock=0
   local ok,err=pcall(function()
     local now=GetTime()
-    if nativeLayoutDirty and nativeLayoutAt and now>=nativeLayoutAt then
-      if InCombatLockdown() then
-        EW.deferred=true
-      else
-        if EW.runtimeEnabled then Ready() end
-        if EW.view then EW.view:Layout(true) end
-        nativeLayoutDirty=false
-        nativeLayoutAt=nil
-        EW.deferred=false
-      end
-    end
     if not EW.runtimeEnabled then return end
     EW.source:Step(now)
     if scanClock>=1 then

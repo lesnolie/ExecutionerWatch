@@ -15,11 +15,6 @@ local function Border(parent,color)
   return lines
 end
 
-local function NativeKey()
-  return table.concat({L.width,L.height,L.gap,L.timerHeight,L.timerFont,
-    L.alertFont,L.alertHeight,L.countWidth,L.countHeight},":")
-end
-
 function View.New()
   local self=setmetatable({slots={},debts={},gaps={},texts={},fade=0,clock=0,enabled=false},View)
   local root=CreateFrame("Frame","ExecutionerWatchFrame",UIParent)
@@ -27,7 +22,6 @@ function View.New()
   root:SetSize(L.total,L.height); root:SetPoint("CENTER",0,-160)
   root:SetMovable(true); root:SetClampedToScreen(true); root:Hide()
   self.native=EW.Native.New(root)
-  self.nativeKey=NativeKey()
   -- Addon-owned animation lives on siblings of the sealed native controls.
   local overlay=CreateFrame("Frame",nil,root)
   self.overlay=overlay
@@ -192,13 +186,6 @@ function View:Layout(forceNative)
   self.root:ClearAllPoints()
   if db.point then self.root:SetPoint(db.point[1],UIParent,db.point[2],db.point[3],db.point[4])
   else self.root:SetPoint("CENTER",0,-160) end
-  local key=NativeKey()
-  if forceNative and self.nativeKey~=key then
-    local old=self.native
-    self.native=EW.Native.New(self.root)
-    self.nativeKey=key
-    if old then old:Destroy() end
-  end
   if self.native then self.native:Layout(db.alertScale) end
   for _, slot in ipairs(self.slots) do
     EW.Gradient(slot.fill:GetStatusBarTexture(),C.low,C.high,db.showGradient)

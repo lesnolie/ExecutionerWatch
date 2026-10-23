@@ -84,6 +84,7 @@ function S:Build()
   end
 
   Label(f,"竖条尺寸与整体比例",290,-55,12):SetTextColor(0.30,0.76,0.65,1)
+  Label(f,"宽高/间距保存后重载界面生效",290,-42,10)
   local function Slider(label,key,lo,hi,step,y,format)
     Label(f,label,290,y,10)
     local value=EW.Font(f,10); value:SetPoint("TOPRIGHT",f,"TOPRIGHT",-16,y)
@@ -155,6 +156,7 @@ function S:Status()
   end
   if EW.view and EW.view.native.failed then label="原生显示初始化失败，请查看 /ew status" end
   if EW.deferred or (EW.view and EW.view.deferred) then label=label.." · 布局脱战后应用" end
+  if EW.reloadRequired then label=label.." · 尺寸已保存，请 /reload" end
   self.status:SetText(spec.." · "..label)
 end
 
