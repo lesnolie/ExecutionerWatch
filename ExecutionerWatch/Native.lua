@@ -1,5 +1,5 @@
 local _, EW = ...
-if not EW.enabled then return end
+if not EW.isWarrior then return end
 -- Only this module creates AuraContainer children. References to sealed
 -- bars/buttons never leave initializeFrame. No shown-state callbacks/readback.
 local Native = {}
@@ -12,6 +12,7 @@ local function NoMouse(frame)
 end
 function Native:Layer(name, parent, width, height, build)
   local outer=CreateFrame("Frame",nil,parent)
+  self.frames[#self.frames+1]=outer
   outer:SetSize(width,height)
   local clip=CreateFrame("Frame",nil,outer,TEMPLATE)
   clip:SetAllPoints(outer); clip:SetClipsChildren(true); NoMouse(clip)
@@ -59,7 +60,7 @@ local function Bar(button,clip,width,height)
   return bar
 end
 function Native.New(root)
-  local self=setmetatable({alerts={},failed=false},Native)
+  local self=setmetatable({alerts={},failed=false,frames={}},Native)
   local L=EW.layout
   self.stacks=self:Layer("stacks",root,L.total,L.height,function(button,clip)
     -- Full pitch includes final gap; outer clip removes it. All 1..5 values
@@ -78,8 +79,8 @@ function Native.New(root)
     assert(button:SetApplicationBar(bar,{maxApplications=EW.cap})~=false,"application binding failed")
   end)
   self.stacks:SetPoint("TOPLEFT",root,"TOPLEFT",0,0)
-  self.count=self:Layer("count",root,40,16,function(button)
-    local text=EW.Font(button,11); text:SetPoint("CENTER")
+  self.count=self:Layer("count",root,L.countWidth,L.countHeight,function(button)
+    local text=EW.Font(button,L.timerFont); text:SetPoint("CENTER")
     assert(button:SetApplicationCount(text)~=false,"count binding failed")
   end)
   self.count:SetPoint("BOTTOM",root,"TOP",0,5)
@@ -87,20 +88,30 @@ function Native.New(root)
   -- alpha; changing alertAt never mutates a sealed native bar.
   for threshold=1,4 do
     local cells=threshold+1
-    self.alerts[threshold]=self:Layer("cancel-"..threshold,root,L.total,20,function(button,clip)
-      local pusher=Bar(button,clip,cells*L.total,20)
+    self.alerts[threshold]=self:Layer("cancel-"..threshold,root,L.total,L.alertHeight,function(button,clip)
+      local pusher=Bar(button,clip,cells*L.total,L.alertHeight)
       pusher:SetStatusBarColor(1,1,1,0)
       local window=CreateFrame("Frame",nil,button,TEMPLATE)
-      window:SetSize(cells*L.total,20); window:SetClipsChildren(true); NoMouse(window)
+      window:SetSize(cells*L.total,L.alertHeight); window:SetClipsChildren(true); NoMouse(window)
       window:SetPoint("RIGHT",pusher:GetStatusBarTexture(),"RIGHT",L.total,0)
       local carrier=CreateFrame("Frame",nil,window,TEMPLATE)
-      carrier:SetSize(L.total,20); carrier:SetPoint("CENTER",clip,"CENTER"); NoMouse(carrier)
-      local text=EW.Font(carrier,14); text:SetPoint("CENTER")
+      carrier:SetSize(L.total,L.alertHeight); carrier:SetPoint("CENTER",clip,"CENTER"); NoMouse(carrier)
+      local text=EW.Font(carrier,L.alertFont); text:SetPoint("CENTER")
       text:SetText("! 取消 !"); text:SetTextColor(0.96,0.36,0.31,1)
       assert(button:SetApplicationBar(pusher,{maxApplications=cells})~=false,"alert binding failed")
     end)
   end
   return self
+end
+function Native:Destroy()
+  -- Called only outside combat. A protected AuraContainer tree cannot be
+  -- resized safely after initialization, so replacement layers are built
+  -- before their predecessors are hidden.
+  for _,frame in ipairs(self.frames) do
+    frame:Hide()
+  end
+  self.alerts={}
+  self.frames={}
 end
 function Native:Layout(scale)
   for _, alert in ipairs(self.alerts) do

@@ -1,5 +1,5 @@
 local _, EW = ...
-if not EW.enabled then return end
+if not EW.isWarrior then return end
 
 -- Pure Lua model: only public, normalized evidence enters here. No game API,
 -- frames, saved variables, or secret values. Records predict stack-loss times;

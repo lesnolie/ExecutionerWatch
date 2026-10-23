@@ -1,6 +1,6 @@
 -- Optional diagnostics. Only public snapshots and addon-owned model events
 -- are logged. Never reads protected-frame visibility/text as combat evidence.
-local VERSION, SPELL, LIMIT, SESSION_LIMIT="0.9.1",445584,5000,8
+local VERSION, SPELL, LIMIT, SESSION_LIMIT="0.10.0",445584,5000,8
 local secret=issecretvalue or function() return false end
 local session,lastSequence,lastState,poll= nil,0,nil,0
 local function Public(v) return not secret(v) end

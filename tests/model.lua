@@ -1,4 +1,4 @@
-local EW={enabled=true,cap=5}
+local EW={enabled=true,isWarrior=true,cap=5}
 assert(loadfile("ExecutionerWatch/Model.lua"))("ExecutionerWatch",EW)
 local M=EW.Model
 local tests=0

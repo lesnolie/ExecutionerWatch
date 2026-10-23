@@ -1,5 +1,5 @@
 local _, EW = ...
-if not EW.enabled then return end
+if not EW.isWarrior then return end
 local D = {version=EW.version, revision=0, eventSeq=0, events={}, errors={}, state="IDLE", stacks=0, debt=0}
 EW.diag, ExecutionerWatchDiag = D, D
 function EW.Record(kind, at, detail)

@@ -7,6 +7,10 @@ function FileHash($path) {
     try { return [BitConverter]::ToString($algorithm.ComputeHash($inputStream)).Replace('-','') }
     finally { $inputStream.Dispose(); $algorithm.Dispose() }
 }
+$mainToc = Join-Path $root 'ExecutionerWatch/ExecutionerWatch.toc'
+$versionMatch = Select-String -LiteralPath $mainToc -Pattern '^## Version:\s*(\S+)\s*$'
+if (-not $versionMatch) { throw 'Main TOC has no Version field' }
+$version = $versionMatch.Matches[0].Groups[1].Value
 $stage = Join-Path $root ('.research/package-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $stage | Out-Null
 foreach ($name in @('ExecutionerWatch', 'ExecutionerProbe')) {
@@ -19,7 +23,7 @@ foreach ($name in @('ExecutionerWatch', 'ExecutionerProbe')) {
     Copy-Item -LiteralPath (Join-Path $root 'README.md') -Destination $target
     New-Item -ItemType Directory -Path (Join-Path $target 'docs') | Out-Null
     Copy-Item -LiteralPath (Join-Path $root 'docs/VALIDATION.md') -Destination (Join-Path $target 'docs/VALIDATION.md')
-    $archive = Join-Path $root ('dist/' + $name + '-0.9.1.zip')
+    $archive = Join-Path $root ('dist/' + $name + '-' + $version + '.zip')
     Compress-Archive -LiteralPath $target -DestinationPath $archive -Force
     $zip = [IO.Compression.ZipFile]::OpenRead($archive)
     try {

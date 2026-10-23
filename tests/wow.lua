@@ -2,7 +2,8 @@
 -- Validates textures, dimensions, lifecycle, hook selection, secret guards,
 -- and post-initialization access to sealed native children. It cannot prove
 -- real WoW protected-frame semantics or render fonts/pixels.
-local W={now=100,combat=false,frames={},logs={},sounds=0,aura=nil,warrior=true}
+local W={now=100,combat=false,frames={},logs={},sounds=0,aura=nil,warrior=true,spec=71,
+  playerName="Main",realmName="TestRealm"}
 local methods={}
 local function object(kind,parent,name)
   local o=setmetatable({kind=kind,parent=parent,name=name,scripts={},events={},shown=true,
@@ -107,6 +108,8 @@ Enum={CooldownViewerCategory={Buff=1},StatusBarInterpolation={Immediate=0}}
 AuraContainerSortMethod={Default=0}; AuraContainerSortDirection={Normal=0}
 AnchorUtil={FlowDirection={Right=1,Down=1}}
 function UnitClass() return "Warrior",W.warrior and "WARRIOR" or "MAGE" end
+function UnitName(unit) assert(unit=="player"); return W.playerName end
+function GetRealmName() return W.realmName end
 function GetTime() return W.now end
 function InCombatLockdown() return W.combat end
 function IsControlKeyDown() return false end
@@ -133,6 +136,8 @@ BuffIconCooldownViewer={GetItemFrames=function() return W.icon and {W.icon} or {
 BuffBarCooldownViewer={GetItemFrames=function() return W.bar and {W.bar} or {} end}
 C_CooldownViewer={GetCooldownViewerCategorySet=function() return {9001} end,
   GetCooldownViewerCooldownInfo=function() return {spellID=445584,linkedSpellIDs={}} end}
+C_SpecializationInfo={GetSpecialization=function() return 1 end,
+  GetSpecializationInfo=function() return W.spec,"Mock","",0 end}
 function hooksecurefunc(frame,method,callback)
   local original=frame[method]
   frame[method]=function(...) original(...); callback(...) end

@@ -15,7 +15,8 @@ end
 EW.db=EW.LoadSettings({})
 local states={}
 for _,mode in ipairs({"normal","debt","cancel","uncertain"}) do
-  local v=EW.View.Preview({previewMode=mode},100,{state="IDLE"})
+  local v=EW.View.Preview({previewMode=mode,enabled=true},100,{state="IDLE"})
+  assert(v and v.rows and v.count, "missing preview state: "..mode)
   states[mode]=v
 end
 print(Encode({layout=EW.layout,colors=EW.colors,states=states}))
