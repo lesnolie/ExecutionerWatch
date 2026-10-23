@@ -133,6 +133,14 @@ end
 
 function View:SetEnabled(enabled)
   self.enabled=enabled == true
+  -- Alpha is already used on this addon-owned root during combat rendering.
+  -- Clear the whole HUD immediately without changing protected visibility.
+  self.root:SetAlpha(self.enabled and EW.db.alpha or 0)
+  if not self.enabled then
+    self.previewMode=nil
+    self.handle:EnableMouse(false)
+    GameTooltip:Hide()
+  end
   if InCombatLockdown() then self.deferred=true; return end
   if self.enabled then self.root:Show(); self.handle:Show()
   else self.root:Hide(); self.handle:Hide(); GameTooltip:Hide() end

@@ -46,6 +46,8 @@ W.combat=true
 SlashCmdList.EXECUTIONERWATCH("off")
 assert(not EW.runtimeEnabled and EW.model.state=="IDLE")
 assert(EW.view.root.shown,"protected root visibility must be deferred in combat")
+assert(EW.view.root.alpha==0,"disabled HUD must disappear immediately in combat")
+assert(EW.view.handle.mouse==false)
 assert(EW.deferred)
 W.combat=false
 W.Event("PLAYER_REGEN_ENABLED")
